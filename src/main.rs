@@ -1,9 +1,12 @@
 mod color;
+mod gl;
+mod vec2;
 
 use color::Color;
+use gl::OpenGl;
+pub use vec2::Vec2;
 
 use confindent::Confindent;
-use glow::HasContext;
 use glutin::{
     dpi::LogicalSize,
     event::{Event, VirtualKeyCode, WindowEvent},
@@ -19,7 +22,7 @@ fn main() {
 
 struct NotSure {
     context: ContextWrapper<PossiblyCurrent, Window>,
-    gl: glow::Context,
+    gl: OpenGl,
     config: Option<Config>,
 }
 
@@ -36,9 +39,7 @@ impl NotSure {
             .unwrap();
         let context = unsafe { wc.make_current().unwrap() };
 
-        let gl = unsafe {
-            glow::Context::from_loader_function(|s| context.get_proc_address(s) as *const _)
-        };
+        let gl = OpenGl::new(&context);
 
         let mut ns = Self {
             gl,
@@ -53,17 +54,14 @@ impl NotSure {
     pub fn load_config(&mut self) {
         let config = Config::load();
 
-        unsafe {
-            let cc = config.clear_color;
-            self.gl.clear_color(cc.r, cc.g, cc.b, cc.a);
-        }
+        unsafe { self.gl.clear_color(config.clear_color) }
 
         self.config = Some(config);
     }
 
     pub fn draw(&self) {
         unsafe {
-            self.gl.clear(glow::COLOR_BUFFER_BIT);
+            self.gl.clear();
         }
     }
 
@@ -84,10 +82,7 @@ impl NotSure {
         match event {
             WindowEvent::Resized(physical) => {
                 self.context.resize(physical);
-                unsafe {
-                    self.gl
-                        .viewport(0, 0, physical.width as i32, physical.height as i32)
-                };
+                unsafe { self.gl.viewport(physical.width, physical.height) };
             }
             WindowEvent::KeyboardInput { input, .. } => {
                 if let Some(VirtualKeyCode::Escape) = input.virtual_keycode {
