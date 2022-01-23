@@ -2,8 +2,10 @@ mod color;
 mod gl;
 mod vec2;
 
+use std::collections::HashMap;
+
 use color::Color;
-use gl::OpenGl;
+use gl::{OpenGl, Texture};
 pub use vec2::Vec2;
 
 use confindent::Confindent;
@@ -24,6 +26,8 @@ struct NotSure {
     context: ContextWrapper<PossiblyCurrent, Window>,
     gl: OpenGl,
     config: Option<Config>,
+    dimensions: Vec2,
+    beescream: Texture,
 }
 
 impl NotSure {
@@ -40,13 +44,20 @@ impl NotSure {
         let context = unsafe { wc.make_current().unwrap() };
 
         let gl = OpenGl::new(&context);
+        let beescream = Texture::from_file(&gl, "images/beescream.png");
+
+        println!("Setup OpenGL!");
 
         let mut ns = Self {
             gl,
             context,
             config: None,
+            dimensions: (640.0, 480.0).into(),
+            beescream,
         };
         ns.load_config();
+
+        println!("Just about to run!");
 
         el.run(move |event, _, flow| ns.event_handler(event, flow))
     }
@@ -62,7 +73,18 @@ impl NotSure {
     pub fn draw(&self) {
         unsafe {
             self.gl.clear();
+
+            self.beescream.bind(&self.gl);
+            self.gl
+                .draw_rectangle((0.0, 0.0).into(), self.tenth_height_square());
         }
+    }
+
+    pub fn tenth_height_square(&self) -> Vec2 {
+        let tenth_height = self.dimensions.y / 10.0 / self.dimensions.y;
+        let tenth_height_width = self.dimensions.y / 10.0 / self.dimensions.x;
+
+        (tenth_height_width, tenth_height).into()
     }
 
     pub fn event_handler(&mut self, event: Event<()>, flow: &mut ControlFlow) {
@@ -82,7 +104,8 @@ impl NotSure {
         match event {
             WindowEvent::Resized(physical) => {
                 self.context.resize(physical);
-                unsafe { self.gl.viewport(physical.width, physical.height) };
+                self.dimensions = (physical.width as f32, physical.height as f32).into();
+                self.gl.viewport(physical.width, physical.height);
             }
             WindowEvent::KeyboardInput { input, .. } => {
                 if let Some(VirtualKeyCode::Escape) = input.virtual_keycode {

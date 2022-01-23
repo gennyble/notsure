@@ -1,6 +1,8 @@
 mod rectangle;
+mod texture;
 
 pub use rectangle::Rectangle;
+pub use texture::Texture;
 
 use std::{path::Path as FilePath, rc::Rc};
 
@@ -11,12 +13,9 @@ use crate::{Color, Vec2};
 
 pub struct OpenGl {
     gl: Rc<glow::Context>,
-    programs: Programs,
+    program: Program,
     clear_color: Color,
-}
-
-struct Programs {
-    color: Program,
+    draw_rect: Rectangle,
 }
 
 impl OpenGl {
@@ -24,15 +23,32 @@ impl OpenGl {
         let gl = unsafe {
             glow::Context::from_loader_function(|s| context.get_proc_address(s) as *const _)
         };
-        let color_program =
+
+        // dirty hack to allow skip on this. Without let _ it would be an expression, and rustfmt::skip
+        // on expressions is nightly
+        #[rustfmt::skip]
+        let _ = unsafe {
+            gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_S, glow::REPEAT as i32);
+            gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_WRAP_T, glow::REPEAT as i32);
+
+            gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MIN_FILTER, glow::NEAREST as i32);
+            gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MAG_FILTER, glow::NEAREST as i32);
+        };
+
+        let program =
             unsafe { Self::create_program(&gl, "shaders/texture.vert", "shaders/texture.frag") };
+
+        unsafe {
+            gl.use_program(Some(program));
+        }
+
+        let draw_rect = Rectangle::new(&gl, (2.0, 2.0).into());
 
         Self {
             gl: Rc::new(gl),
-            programs: Programs {
-                color: color_program,
-            },
+            program,
             clear_color: Color::rgba(0.0, 0.0, 0.0, 1.0),
+            draw_rect,
         }
     }
 
@@ -99,10 +115,26 @@ impl OpenGl {
 
         program
     }
+
+    pub fn draw_rectangle(&self, pos: Vec2, dim: Vec2) {
+        unsafe {
+            //self.gl.use_program(Some(self.program));
+
+            let uniform_position = self.gl.get_uniform_location(self.program, "WorldPosition");
+            let uniform_scale = self.gl.get_uniform_location(self.program, "Scale");
+            self.gl
+                .uniform_2_f32(uniform_position.as_ref(), pos.x, pos.y);
+            self.gl.uniform_2_f32(uniform_scale.as_ref(), dim.x, dim.y);
+
+            self.draw_rect.bind(&self.gl);
+            self.gl
+                .draw_elements(glow::TRIANGLES, 6, glow::UNSIGNED_BYTE, 0);
+        }
+    }
 }
 
 impl Drop for OpenGl {
     fn drop(&mut self) {
-        unsafe { self.gl.delete_program(self.programs.color) }
+        unsafe { self.gl.delete_program(self.program) }
     }
 }
