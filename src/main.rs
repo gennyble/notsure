@@ -2,8 +2,6 @@ mod color;
 mod gl;
 mod vec2;
 
-use std::collections::HashMap;
-
 use color::Color;
 use gl::{OpenGl, Texture};
 pub use vec2::Vec2;
@@ -19,7 +17,13 @@ use glutin::{
 };
 
 fn main() {
-    let _notsure = NotSure::run();
+    let command = std::env::args().nth(1);
+
+    match command.as_deref() {
+        Some("server") => todo!(),
+        Some("client") | None => NotSure::run(),
+        Some(cmd) => eprintln!("'{}' is not a thing, silly :3", cmd),
+    }
 }
 
 struct NotSure {
@@ -65,7 +69,7 @@ impl NotSure {
     pub fn load_config(&mut self) {
         let config = Config::load();
 
-        unsafe { self.gl.clear_color(config.clear_color) }
+        self.gl.clear_color(config.clear_color);
 
         self.config = Some(config);
     }
