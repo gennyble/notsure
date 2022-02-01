@@ -1,4 +1,7 @@
-use std::ops::Div;
+use core::fmt;
+use std::ops::{Add, Div, Mul};
+
+use glutin::dpi::PhysicalSize;
 
 #[derive(Copy, Clone, Debug)]
 pub struct Vec2 {
@@ -16,6 +19,36 @@ impl Vec2 {
     }
 }
 
+impl Add for Vec2 {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+        }
+    }
+}
+
+impl Mul<f32> for Vec2 {
+    type Output = Vec2;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Self {
+            x: self.x * rhs,
+            y: self.y * rhs,
+        }
+    }
+}
+
+impl Mul<u32> for Vec2 {
+    type Output = Vec2;
+
+    fn mul(self, rhs: u32) -> Self::Output {
+        self * rhs as f32
+    }
+}
+
 impl Div<f32> for Vec2 {
     type Output = Vec2;
 
@@ -24,6 +57,31 @@ impl Div<f32> for Vec2 {
             x: self.x / rhs,
             y: self.y / rhs,
         }
+    }
+}
+
+impl Div<u32> for Vec2 {
+    type Output = Vec2;
+
+    fn div(self, rhs: u32) -> Self::Output {
+        self / rhs as f32
+    }
+}
+
+impl Div for Vec2 {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x / rhs.x,
+            y: self.y / rhs.y,
+        }
+    }
+}
+
+impl From<(f32, f32)> for Vec2 {
+    fn from(t: (f32, f32)) -> Self {
+        Self { x: t.0, y: t.1 }
     }
 }
 
@@ -36,8 +94,26 @@ impl From<(u32, u32)> for Vec2 {
     }
 }
 
-impl From<(f32, f32)> for Vec2 {
-    fn from(t: (f32, f32)) -> Self {
-        Self { x: t.0, y: t.1 }
+impl From<PhysicalSize<f32>> for Vec2 {
+    fn from(p: PhysicalSize<f32>) -> Self {
+        Self {
+            x: p.width,
+            y: p.height,
+        }
+    }
+}
+
+impl From<PhysicalSize<u32>> for Vec2 {
+    fn from(p: PhysicalSize<u32>) -> Self {
+        Self {
+            x: p.width as f32,
+            y: p.height as f32,
+        }
+    }
+}
+
+impl fmt::Display for Vec2 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
     }
 }

@@ -2,19 +2,54 @@ mod color;
 mod gl;
 mod vec2;
 
+use std::{cell::RefCell, cmp::Ordering, rc::Rc};
+
 use color::Color;
 use gl::{OpenGl, Texture};
 pub use vec2::Vec2;
 
 use confindent::Confindent;
 use glutin::{
-    dpi::LogicalSize,
+    dpi::PhysicalSize,
     event::{Event, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     platform::unix::WindowBuilderExtUnix,
     window::{Window, WindowBuilder},
     ContextBuilder, ContextWrapper, PossiblyCurrent,
 };
+
+/// OpenGL's normalized coordinates are relative to each axis, which would make
+/// sizing something like a square quite difficult. So we have our own unit of
+/// measurement, Murs.
+pub struct Transform {
+    pub dpi_scale: f32,
+    pub physical_size: PhysicalSize<u32>,
+    pub physical_vec: Vec2,
+    pub mur_axis_size: u32,
+    pub mur_size: u32,
+}
+
+impl Transform {
+    /// The mur_size is the number of pixels per Mur.
+    pub fn new(physical_size: PhysicalSize<u32>, mur_size: u32) -> Self {
+        let mur_axis_size = match physical_size.width.cmp(&physical_size.height) {
+            Ordering::Equal | Ordering::Greater => physical_size.width,
+            Ordering::Less => physical_size.height,
+        };
+
+        Self {
+            dpi_scale: 1.0,
+            physical_size,
+            physical_vec: physical_size.into(),
+            mur_axis_size,
+            mur_size,
+        }
+    }
+
+    pub fn vec_to_opengl(&self, vec: Vec2) -> Vec2 {
+        (vec * self.mur_size) / (self.physical_vec / 2)
+    }
+}
 
 fn main() {
     let command = std::env::args().nth(1);
@@ -30,25 +65,31 @@ struct NotSure {
     context: ContextWrapper<PossiblyCurrent, Window>,
     gl: OpenGl,
     config: Option<Config>,
-    dimensions: Vec2,
+    transform: Rc<RefCell<Transform>>,
+
     beescream: Texture,
 }
 
 impl NotSure {
     pub fn run() -> ! {
+        let window_size = PhysicalSize::new(640, 240);
+
         let el = EventLoop::new();
         let wb = WindowBuilder::new()
             .with_title("notsure")
             .with_app_id("pleasefloat".into())
-            .with_inner_size(LogicalSize::new(640.0, 480.0));
+            .with_inner_size(window_size);
         let wc = ContextBuilder::new()
             .with_vsync(true)
             .build_windowed(wb, &el)
             .unwrap();
         let context = unsafe { wc.make_current().unwrap() };
 
-        let gl = OpenGl::new(&context);
-        let beescream = Texture::from_file(&gl, "images/beescream.png");
+        let transform = Transform::new(window_size, 320);
+        let wrapped_transform = Rc::new(RefCell::new(transform));
+
+        let gl = OpenGl::new(&context, wrapped_transform.clone());
+        let beescream = Texture::from_file(&gl, "images/eightytest.png");
 
         println!("Setup OpenGL!");
 
@@ -56,7 +97,8 @@ impl NotSure {
             gl,
             context,
             config: None,
-            dimensions: (640.0, 480.0).into(),
+            transform: wrapped_transform,
+
             beescream,
         };
         ns.load_config();
@@ -79,16 +121,11 @@ impl NotSure {
             self.gl.clear();
 
             self.beescream.bind(&self.gl);
-            self.gl
-                .draw_rectangle((0.0, 0.0).into(), self.tenth_height_square());
+            for x in 0..8 {
+                self.gl
+                    .draw_rectangle(((x as f32 - 4.0) * 0.25, 0.125).into(), (0.25, 0.25).into());
+            }
         }
-    }
-
-    pub fn tenth_height_square(&self) -> Vec2 {
-        let tenth_height = self.dimensions.y / 10.0 / self.dimensions.y;
-        let tenth_height_width = self.dimensions.y / 10.0 / self.dimensions.x;
-
-        (tenth_height_width, tenth_height).into()
     }
 
     pub fn event_handler(&mut self, event: Event<()>, flow: &mut ControlFlow) {
@@ -107,8 +144,8 @@ impl NotSure {
     pub fn window_event(&mut self, event: WindowEvent, flow: &mut ControlFlow) {
         match event {
             WindowEvent::Resized(physical) => {
+                self.transform.borrow_mut().physical_size = physical;
                 self.context.resize(physical);
-                self.dimensions = (physical.width as f32, physical.height as f32).into();
                 self.gl.viewport(physical.width, physical.height);
             }
             WindowEvent::KeyboardInput { input, .. } => {

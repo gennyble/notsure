@@ -4,22 +4,26 @@ mod texture;
 pub use rectangle::Rectangle;
 pub use texture::Texture;
 
-use std::{path::Path as FilePath, rc::Rc};
+use std::{cell::RefCell, path::Path as FilePath, rc::Rc};
 
 use glow::{HasContext, Program};
 use glutin::{window::Window, ContextWrapper, PossiblyCurrent};
 
-use crate::{Color, Vec2};
+use crate::{Color, Transform, Vec2};
 
 pub struct OpenGl {
     gl: Rc<glow::Context>,
+    transform: Rc<RefCell<Transform>>,
     program: Program,
     clear_color: Color,
     draw_rect: Rectangle,
 }
 
 impl OpenGl {
-    pub fn new(context: &ContextWrapper<PossiblyCurrent, Window>) -> Self {
+    pub fn new(
+        context: &ContextWrapper<PossiblyCurrent, Window>,
+        transform: Rc<RefCell<Transform>>,
+    ) -> Self {
         let gl = unsafe {
             glow::Context::from_loader_function(|s| context.get_proc_address(s) as *const _)
         };
@@ -49,6 +53,7 @@ impl OpenGl {
 
         Self {
             gl: Rc::new(gl),
+            transform,
             program,
             clear_color: Color::rgba(0.0, 0.0, 0.0, 1.0),
             draw_rect,
@@ -120,14 +125,29 @@ impl OpenGl {
     }
 
     pub fn draw_rectangle(&self, pos: Vec2, dim: Vec2) {
+        //XXX: *screaming*
+        // This function is a little uh,,, fucky-wucky. The rectangle we use to draw, self.draw_rect,
+        // spans from (OpenGL Normalized Coordinates) -1,1 to 1,-1. That means any scale we appply
+        // via out little uniform will be 2x, as it multiplies both verticies away from the center.
+        // That's why gl_dim is half of the dimension we're given and why it looks like the position
+        // is offset by the full width/height. It's also why we can give both uniforms the same number.
+        // In other words: Here Be Dragons.
+
+        let gl_pos = self.transform.borrow().vec_to_opengl(pos);
+        let gl_dim = self.transform.borrow().vec_to_opengl(dim / 2);
+
         unsafe {
             //self.gl.use_program(Some(self.program));
 
             let uniform_position = self.gl.get_uniform_location(self.program, "WorldPosition");
             let uniform_scale = self.gl.get_uniform_location(self.program, "Scale");
+            self.gl.uniform_2_f32(
+                uniform_position.as_ref(),
+                gl_pos.x + gl_dim.x,
+                gl_pos.y - gl_dim.y,
+            );
             self.gl
-                .uniform_2_f32(uniform_position.as_ref(), pos.x, pos.y);
-            self.gl.uniform_2_f32(uniform_scale.as_ref(), dim.x, dim.y);
+                .uniform_2_f32(uniform_scale.as_ref(), gl_dim.x, gl_dim.y);
 
             self.draw_rect.bind(&self.gl);
             self.gl
