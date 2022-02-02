@@ -154,6 +154,21 @@ impl OpenGl {
                 .draw_elements(glow::TRIANGLES, 6, glow::UNSIGNED_BYTE, 0);
         }
     }
+
+    pub fn draw_fullscreen(&self) {
+        unsafe {
+            //self.gl.use_program(Some(self.program));
+
+            let uniform_position = self.gl.get_uniform_location(self.program, "WorldPosition");
+            let uniform_scale = self.gl.get_uniform_location(self.program, "Scale");
+            self.gl.uniform_2_f32(uniform_position.as_ref(), 0.0, 0.0);
+            self.gl.uniform_2_f32(uniform_scale.as_ref(), 1.0, 1.0);
+
+            self.draw_rect.bind(&self.gl);
+            self.gl
+                .draw_elements(glow::TRIANGLES, 6, glow::UNSIGNED_BYTE, 0);
+        }
+    }
 }
 
 impl Drop for OpenGl {

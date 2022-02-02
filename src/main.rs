@@ -25,23 +25,22 @@ pub struct Transform {
     pub dpi_scale: f32,
     pub physical_size: PhysicalSize<u32>,
     pub physical_vec: Vec2,
-    pub mur_axis_size: u32,
+    pub mur_dimensions: Vec2,
+    pub mur_half_dimensions: Vec2,
     pub mur_size: u32,
 }
 
 impl Transform {
     /// The mur_size is the number of pixels per Mur.
     pub fn new(physical_size: PhysicalSize<u32>, mur_size: u32) -> Self {
-        let mur_axis_size = match physical_size.width.cmp(&physical_size.height) {
-            Ordering::Equal | Ordering::Greater => physical_size.width,
-            Ordering::Less => physical_size.height,
-        };
+        let mur_dimensions = Vec2::from(physical_size) / mur_size;
 
         Self {
             dpi_scale: 1.0,
             physical_size,
             physical_vec: physical_size.into(),
-            mur_axis_size,
+            mur_half_dimensions: mur_dimensions / 2.0,
+            mur_dimensions,
             mur_size,
         }
     }
@@ -56,12 +55,14 @@ enum Tile {
     Nothing,
     Spawn,
     Air,
+    Grass,
+    Dirt,
     Ground,
 }
 
 struct Gridworld {
-    pub width: u32,
-    pub height: u32,
+    pub width: usize,
+    pub height: usize,
     pub grid: Vec<Tile>,
 }
 
@@ -70,6 +71,21 @@ impl Gridworld {
         let contents = std::fs::read_to_string(path.as_ref()).unwrap();
 
         contents.parse().unwrap()
+    }
+
+    pub fn find_spawn(&self) -> Option<Vec2> {
+        for (idx, tile) in self.grid.iter().enumerate() {
+            if *tile == Tile::Spawn {
+                let position = Vec2 {
+                    x: (idx % self.width) as f32,
+                    y: (idx / self.width) as f32,
+                };
+
+                return Some(position);
+            }
+        }
+
+        None
     }
 }
 
@@ -94,7 +110,10 @@ impl FromStr for Gridworld {
                     let tile = match chars.collect::<String>().as_ref() {
                         "Spawn" => Tile::Spawn,
                         "Air" => Tile::Air,
+                        "Grass" => Tile::Grass,
+                        "Dirt" => Tile::Dirt,
                         "Ground" => Tile::Ground,
+                        "Nothing" => Tile::Nothing,
                         _ => panic!(),
                     };
 
@@ -109,7 +128,7 @@ impl FromStr for Gridworld {
 
         for line in lines {
             let chars = line.trim().chars();
-            width = line.trim().len() as u32;
+            width = line.trim().len();
             height += 1;
 
             for ch in chars {
@@ -138,15 +157,47 @@ fn main() {
     }
 }
 
+struct Entity {
+    pub texture: Texture,
+    pub position: Vec2,
+    pub dimensions: Vec2,
+}
+
+impl Entity {
+    pub fn center(&self) -> Vec2 {
+        let mut center = self.position.clone();
+        let halfdim = self.dimensions / 2;
+        center.x += halfdim.x;
+        center.y -= halfdim.y;
+
+        center
+    }
+
+    pub fn model_center(&self) -> Vec2 {
+        let mut halfdim = self.dimensions / 2;
+        halfdim.y *= -1.0;
+
+        halfdim
+    }
+
+    pub fn bottom(&self) -> Vec2 {
+        let mut pos = self.position;
+        pos.y += self.dimensions.y;
+
+        pos
+    }
+}
+
 struct NotSure {
     context: ContextWrapper<PossiblyCurrent, Window>,
     gl: OpenGl,
     config: Option<Config>,
     transform: Rc<RefCell<Transform>>,
 
-    beescream: Texture,
+    siva: Entity,
     gridworld: Gridworld,
     tile_textures: HashMap<Tile, Texture>,
+    background: Texture,
 }
 
 impl NotSure {
@@ -164,15 +215,26 @@ impl NotSure {
             .unwrap();
         let context = unsafe { wc.make_current().unwrap() };
 
-        let transform = Transform::new(window_size, 48);
+        let transform = Transform::new(window_size, 24);
         let wrapped_transform = Rc::new(RefCell::new(transform));
 
         let gl = OpenGl::new(&context, wrapped_transform.clone());
-        let beescream = Texture::from_file(&gl, "images/beescream.png");
+        let siva = Entity {
+            texture: Texture::from_file(&gl, "images/siva.png"),
+            position: (0.0, 0.0).into(),
+            dimensions: (1.33, 2.5).into(),
+        };
+        let background = Texture::from_file(&gl, "images/background.png");
         let gridworld = Gridworld::from_file("test.grid");
 
         let mut tile_textures = HashMap::new();
-        let tile_paths = vec![(Tile::Air, "air"), (Tile::Ground, "ground")];
+        let tile_paths = vec![
+            (Tile::Ground, "ground"),
+            (Tile::Air, "air"),
+            (Tile::Grass, "grass"),
+            (Tile::Dirt, "dirt"),
+        ];
+
         for (tile, name) in tile_paths.into_iter() {
             tile_textures.insert(
                 tile,
@@ -188,11 +250,23 @@ impl NotSure {
             config: None,
             transform: wrapped_transform,
 
-            beescream,
+            siva,
             gridworld,
             tile_textures,
+            background,
         };
         ns.load_config();
+
+        match ns.gridworld.find_spawn() {
+            None => {
+                println!("Could not move siva to spawn!")
+            }
+            Some(mut spawn) => {
+                // Tiles are 1x1 and we want them on the ground
+                spawn.y -= 1.0 + ns.siva.dimensions.y;
+                ns.siva.position = spawn;
+            }
+        }
 
         println!("Just about to run!");
 
@@ -208,25 +282,40 @@ impl NotSure {
     }
 
     pub fn draw(&self) {
-        unsafe {
-            self.gl.clear();
+        let mut camera = self.siva.center();
+        camera.y *= -1.0;
 
+        //camera.x = 0.0;
+        //camera.y = 0.0;
+
+        unsafe {
+            // Draw the background
+            self.gl.clear();
+            self.background.bind(&self.gl);
+            self.gl.draw_fullscreen();
+
+            // Now draw the tile world itself
             for (idx, tile) in self.gridworld.grid.iter().enumerate() {
-                if *tile == Tile::Spawn {
+                if *tile == Tile::Spawn || *tile == Tile::Nothing {
                     continue;
                 }
 
-                let x =
-                    (idx as i32 % self.gridworld.width as i32) - (self.gridworld.width as i32 / 2);
-                let y =
-                    (idx as i32 / self.gridworld.width as i32) + (self.gridworld.height as i32 / 2);
+                let x = (idx as f32 % self.gridworld.width as f32).floor();
+                let y = (idx as f32 / self.gridworld.width as f32).floor();
 
                 self.tile_textures.get(tile).unwrap().bind(&self.gl);
                 self.gl.draw_rectangle(
-                    (x as f32, self.gridworld.height as f32 - y as f32).into(),
+                    Vec2::new(x, self.gridworld.height as f32 - y) - camera,
                     (1.0, 1.0).into(),
                 )
             }
+
+            // Finally, draw siva
+            let mut draw = self.siva.model_center() * -1.0;
+            draw.y += self.siva.dimensions.y;
+
+            self.siva.texture.bind(&self.gl);
+            self.gl.draw_rectangle(draw, self.siva.dimensions);
         }
     }
 
