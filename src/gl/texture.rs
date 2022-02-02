@@ -43,4 +43,8 @@ impl Texture {
     pub unsafe fn bind(&self, ogl: &OpenGl) {
         ogl.gl().bind_texture(glow::TEXTURE_2D, Some(self.texture));
     }
+
+    pub unsafe fn delete(&self, ogl: &OpenGl) {
+        ogl.gl().delete_texture(self.texture)
+    }
 }

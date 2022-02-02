@@ -73,4 +73,8 @@ impl Rectangle {
         gl.bind_vertex_array(Some(self.vao));
         gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(self.ebo));
     }
+
+    pub unsafe fn delete(&self, gl: &glow::Context) {
+        gl.delete_vertex_array(self.vao);
+    }
 }

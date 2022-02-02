@@ -2,7 +2,14 @@ mod color;
 mod gl;
 mod vec2;
 
-use std::{cell::RefCell, cmp::Ordering, collections::HashMap, path::Path, rc::Rc, str::FromStr};
+use std::{
+    cell::RefCell,
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+    path::Path,
+    rc::Rc,
+    str::FromStr,
+};
 
 use color::Color;
 use gl::{OpenGl, Texture};
@@ -11,7 +18,7 @@ pub use vec2::Vec2;
 use confindent::Confindent;
 use glutin::{
     dpi::PhysicalSize,
-    event::{Event, VirtualKeyCode, WindowEvent},
+    event::{ElementState, Event, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     platform::unix::WindowBuilderExtUnix,
     window::{Window, WindowBuilder},
@@ -191,13 +198,14 @@ impl Entity {
 struct NotSure {
     context: ContextWrapper<PossiblyCurrent, Window>,
     gl: OpenGl,
-    config: Option<Config>,
+    config: Config,
     transform: Rc<RefCell<Transform>>,
 
     siva: Entity,
     gridworld: Gridworld,
     tile_textures: HashMap<Tile, Texture>,
     background: Texture,
+    down_keys: HashSet<VirtualKeyCode>,
 }
 
 impl NotSure {
@@ -247,13 +255,14 @@ impl NotSure {
         let mut ns = Self {
             gl,
             context,
-            config: None,
+            config: Config::default(),
             transform: wrapped_transform,
 
             siva,
             gridworld,
             tile_textures,
             background,
+            down_keys: HashSet::new(),
         };
         ns.load_config();
 
@@ -274,11 +283,17 @@ impl NotSure {
     }
 
     pub fn load_config(&mut self) {
-        let config = Config::load();
+        self.config.load();
 
-        self.gl.clear_color(config.clear_color);
+        self.gl.clear_color(self.config.clear_color);
+    }
 
-        self.config = Some(config);
+    pub fn update(&mut self) {
+        if self.down_keys.contains(&VirtualKeyCode::D) {
+            self.siva.position.x += self.config.player_speed;
+        } else if self.down_keys.contains(&VirtualKeyCode::A) {
+            self.siva.position.x -= self.config.player_speed;
+        }
     }
 
     pub fn draw(&self) {
@@ -321,10 +336,17 @@ impl NotSure {
 
     pub fn event_handler(&mut self, event: Event<()>, flow: &mut ControlFlow) {
         match event {
-            Event::LoopDestroyed => return,
+            Event::LoopDestroyed => unsafe {
+                self.siva.texture.delete(&self.gl);
+
+                for texture in self.tile_textures.values() {
+                    texture.delete(&self.gl);
+                }
+            },
             Event::WindowEvent { event, .. } => self.window_event(event, flow),
             Event::RedrawRequested(_) => self.context.swap_buffers().unwrap(),
             Event::MainEventsCleared => {
+                self.update();
                 self.draw();
                 self.context.swap_buffers().unwrap();
             }
@@ -344,14 +366,22 @@ impl NotSure {
                     *flow = ControlFlow::Exit;
                 } else if let Some(VirtualKeyCode::R) = input.virtual_keycode {
                     self.load_config();
-                } else if let Some(VirtualKeyCode::A) = input.virtual_keycode {
-                    self.siva.position.x -= 0.1;
-                } else if let Some(VirtualKeyCode::D) = input.virtual_keycode {
-                    self.siva.position.x += 0.1;
-                } else if let Some(VirtualKeyCode::W) = input.virtual_keycode {
-                    self.siva.position.y += 0.1;
-                } else if let Some(VirtualKeyCode::S) = input.virtual_keycode {
-                    self.siva.position.y -= 0.1;
+                }
+
+                if let Some(keycode) = input.virtual_keycode {
+                    match input.state {
+                        ElementState::Pressed => {
+                            self.down_keys.insert(keycode);
+                        }
+                        ElementState::Released => match self.down_keys.contains(&keycode) {
+                            true => {
+                                self.down_keys.remove(&keycode);
+                            }
+                            false => {
+                                eprintln!("Keycode {:?} was release, but never pressed?", keycode)
+                            }
+                        },
+                    }
                 }
             }
             _ => (),
@@ -359,15 +389,17 @@ impl NotSure {
     }
 }
 
+#[derive(Debug, Default)]
 struct Config {
     pub clear_color: Color,
+    pub player_speed: f32,
 }
 
 impl Config {
-    pub fn load() -> Self {
+    pub fn load(&mut self) {
         let conf = Confindent::from_file("notsure.conf").unwrap();
-        let clear_color = conf.child_parse("ClearColor").unwrap();
 
-        Self { clear_color }
+        self.clear_color = conf.child_parse("ClearColor").unwrap();
+        self.player_speed = conf.child_parse("PlayerSpeed").unwrap();
     }
 }

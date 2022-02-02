@@ -173,6 +173,9 @@ impl OpenGl {
 
 impl Drop for OpenGl {
     fn drop(&mut self) {
-        unsafe { self.gl.delete_program(self.program) }
+        unsafe {
+            self.gl.delete_program(self.program);
+            self.draw_rect.delete(&self.gl);
+        }
     }
 }

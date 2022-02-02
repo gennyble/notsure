@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use thiserror::Error;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct Color {
     pub r: f32,
     pub g: f32,
