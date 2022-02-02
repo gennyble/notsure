@@ -344,6 +344,14 @@ impl NotSure {
                     *flow = ControlFlow::Exit;
                 } else if let Some(VirtualKeyCode::R) = input.virtual_keycode {
                     self.load_config();
+                } else if let Some(VirtualKeyCode::A) = input.virtual_keycode {
+                    self.siva.position.x -= 0.1;
+                } else if let Some(VirtualKeyCode::D) = input.virtual_keycode {
+                    self.siva.position.x += 0.1;
+                } else if let Some(VirtualKeyCode::W) = input.virtual_keycode {
+                    self.siva.position.y += 0.1;
+                } else if let Some(VirtualKeyCode::S) = input.virtual_keycode {
+                    self.siva.position.y -= 0.1;
                 }
             }
             _ => (),
