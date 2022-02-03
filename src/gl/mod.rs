@@ -125,13 +125,9 @@ impl OpenGl {
     }
 
     pub fn draw_rectangle(&self, pos: Vec2, dim: Vec2) {
-        //XXX: *screaming*
-        // This function is a little uh,,, fucky-wucky. The rectangle we use to draw, self.draw_rect,
-        // spans from (OpenGL Normalized Coordinates) -1,1 to 1,-1. That means any scale we appply
-        // via out little uniform will be 2x, as it multiplies both verticies away from the center.
-        // That's why gl_dim is half of the dimension we're given and why it looks like the position
-        // is offset by the full width/height. It's also why we can give both uniforms the same number.
-        // In other words: Here Be Dragons.
+        // The rectangle we use to draw, self.draw_rect, spans from (OpenGL Normalized Coordinates)
+        // -1,1 to 1,-1. That means any scale we appply via our little uniform will be 2x, as it
+        // multiplies both verticies away from the center.
 
         let gl_pos = self.transform.borrow().vec_to_opengl(pos);
         let gl_dim = self.transform.borrow().vec_to_opengl(dim / 2);
@@ -141,11 +137,8 @@ impl OpenGl {
 
             let uniform_position = self.gl.get_uniform_location(self.program, "WorldPosition");
             let uniform_scale = self.gl.get_uniform_location(self.program, "Scale");
-            self.gl.uniform_2_f32(
-                uniform_position.as_ref(),
-                gl_pos.x + gl_dim.x,
-                gl_pos.y - gl_dim.y,
-            );
+            self.gl
+                .uniform_2_f32(uniform_position.as_ref(), gl_pos.x, gl_pos.y);
             self.gl
                 .uniform_2_f32(uniform_scale.as_ref(), gl_dim.x, gl_dim.y);
 

@@ -4,7 +4,6 @@ mod vec2;
 
 use std::{
     cell::RefCell,
-    cmp::Ordering,
     collections::{HashMap, HashSet},
     path::Path,
     rc::Rc,
@@ -52,7 +51,8 @@ impl Transform {
         }
     }
 
-    pub fn vec_to_opengl(&self, vec: Vec2) -> Vec2 {
+    pub fn vec_to_opengl(&self, mut vec: Vec2) -> Vec2 {
+        vec.y *= -1.0;
         (vec * self.mur_size) / (self.physical_vec / 2)
     }
 }
@@ -168,30 +168,24 @@ struct Entity {
     pub texture: Texture,
     pub position: Vec2,
     pub dimensions: Vec2,
+    pub half_dimensions: Vec2,
 }
 
 impl Entity {
-    pub fn center(&self) -> Vec2 {
-        let mut center = self.position.clone();
-        let halfdim = self.dimensions / 2;
-        center.x += halfdim.x;
-        center.y -= halfdim.y;
+    pub fn new<P: Into<Vec2>, D: Into<Vec2>>(texture: Texture, position: P, dimensions: D) -> Self {
+        let dim = dimensions.into();
 
-        center
+        Entity {
+            texture,
+            position: position.into(),
+            dimensions: dim,
+            half_dimensions: dim / 2,
+        }
     }
 
-    pub fn model_center(&self) -> Vec2 {
-        let mut halfdim = self.dimensions / 2;
-        halfdim.y *= -1.0;
-
-        halfdim
-    }
-
-    pub fn bottom(&self) -> Vec2 {
-        let mut pos = self.position;
-        pos.y += self.dimensions.y;
-
-        pos
+    pub fn set_dimensions<D: Into<Vec2>>(&mut self, dimensions: D) {
+        self.dimensions = dimensions.into();
+        self.half_dimensions = self.dimensions / 2;
     }
 }
 
@@ -227,11 +221,11 @@ impl NotSure {
         let wrapped_transform = Rc::new(RefCell::new(transform));
 
         let gl = OpenGl::new(&context, wrapped_transform.clone());
-        let siva = Entity {
-            texture: Texture::from_file(&gl, "images/siva.png"),
-            position: (0.0, 0.0).into(),
-            dimensions: (1.33, 2.5).into(),
-        };
+        let siva = Entity::new(
+            Texture::from_file(&gl, "images/siva.png"),
+            (0.0, 0.0),
+            (1.33, 2.5),
+        );
         let background = Texture::from_file(&gl, "images/background.png");
         let gridworld = Gridworld::from_file("test.grid");
 
@@ -271,9 +265,9 @@ impl NotSure {
                 println!("Could not move siva to spawn!")
             }
             Some(mut spawn) => {
-                // Tiles are 1x1 and we want them on the ground
-                spawn.y -= 1.0 + ns.siva.dimensions.y;
+                spawn.y += ns.siva.half_dimensions.y - 0.50;
                 ns.siva.position = spawn;
+                println!("spawn: {}", spawn);
             }
         }
 
@@ -297,11 +291,8 @@ impl NotSure {
     }
 
     pub fn draw(&self) {
-        let mut camera = self.siva.center();
-        camera.y *= -1.0;
-
-        //camera.x = 0.0;
-        //camera.y = 0.0;
+        let mut camera = self.siva.position;
+        camera.x *= -1.0;
 
         unsafe {
             // Draw the background
@@ -315,22 +306,22 @@ impl NotSure {
                     continue;
                 }
 
-                let x = (idx as f32 % self.gridworld.width as f32).floor();
+                let x = (idx as f32 % self.gridworld.width as f32);
                 let y = (idx as f32 / self.gridworld.width as f32).floor();
 
                 self.tile_textures.get(tile).unwrap().bind(&self.gl);
-                self.gl.draw_rectangle(
-                    Vec2::new(x, self.gridworld.height as f32 - y) - camera,
-                    (1.0, 1.0).into(),
-                )
+                self.gl
+                    .draw_rectangle(Vec2::new(x, y) + camera, (1.0, 1.0).into())
             }
 
-            // Finally, draw siva
-            let mut draw = self.siva.model_center() * -1.0;
-            draw.y += self.siva.dimensions.y;
+            //self.tile_textures.get(&Tile::Grass).unwrap().bind(&self.gl);
+            //self.gl
+            //    .draw_rectangle(Vec2::new(7.0, 0.0) + camera, (1.0, 1.0).into());
 
+            // Finally, draw siva
             self.siva.texture.bind(&self.gl);
-            self.gl.draw_rectangle(draw, self.siva.dimensions);
+            self.gl
+                .draw_rectangle((0.0, 0.0).into(), self.siva.dimensions);
         }
     }
 

@@ -22,12 +22,14 @@ impl Rectangle {
         let hx = size.x / 2.0;
         let hy = size.y / 2.0;
 
+        let tex_far = tex_pos + tex_dim;
+
         #[rustfmt::skip]
         let verticies = [
-            hx, hy, tex_pos.x + tex_dim.x, tex_pos.y, // top right
-            hx, -hy, tex_pos.x + tex_dim.x, tex_pos.y + tex_dim.y, // bottom right
-            -hx, -hy, tex_pos.x, tex_pos.y + tex_dim.y, // bottom left,
-            -hx, hy, tex_pos.x, tex_pos.y // top left
+            hx, hy, tex_far.x, tex_far.y, // top right
+            hx, -hy, tex_far.x, tex_pos.y, // bottom right
+            -hx, -hy, tex_pos.x, tex_pos.y, // bottom left,
+            -hx, hy, tex_pos.x, tex_far.y // top left
         ];
 
         #[rustfmt::skip]
