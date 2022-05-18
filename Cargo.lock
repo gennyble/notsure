@@ -125,12 +125,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
-name = "confindent"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bde72d4386a91c9079073be49a06b7bbe8204d04868963417015f3556be2c9e"
-
-[[package]]
 name = "core-foundation"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -647,11 +641,7 @@ dependencies = [
 name = "notsure"
 version = "0.1.0"
 dependencies = [
- "confindent",
- "glow",
- "glutin",
- "image",
- "thiserror",
+ "smitten",
 ]
 
 [[package]]
@@ -904,6 +894,16 @@ dependencies = [
  "wayland-client",
  "wayland-cursor",
  "wayland-protocols",
+]
+
+[[package]]
+name = "smitten"
+version = "0.1.0"
+dependencies = [
+ "glow",
+ "glutin",
+ "image",
+ "thiserror",
 ]
 
 [[package]]
