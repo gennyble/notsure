@@ -1,8 +1,12 @@
 use smitten::Vec2;
 
+const TOLERANCE: f32 = 0.00001;
+
 pub trait AxisAlignedBoundingBox {
 	fn bottom_left(&self) -> Vec2;
 	fn top_right(&self) -> Vec2;
+	fn previous_bottom_left(&self) -> Vec2;
+	fn previous_top_rght(&self) -> Vec2;
 }
 
 pub fn aabb_check<A, B>(a: &A, b: &B) -> bool
@@ -71,6 +75,42 @@ impl LineSegment {
 	pub fn parallel_to(&self, b: &LineSegment) -> bool {
 		(self.vertical() && b.vertical()) || self.slope == b.slope
 	}
+
+	//TODO: gen- Check coincident (line contained in the other)
+	pub fn intersects_with(&self, b: &LineSegment) -> bool {
+		self.bounding_box_collides_with(b)
+			&& self.touches_or_crosses(b)
+			&& b.touches_or_crosses(self)
+	}
+
+	fn bounding_box_collides_with(&self, b: &LineSegment) -> bool {
+		self.start.x <= b.end.x
+			&& self.end.x >= b.start.x
+			&& self.start.y <= b.end.y
+			&& self.end.y >= b.start.y
+	}
+
+	fn point_cross_product(a: Vec2, b: Vec2) -> f32 {
+		a.x * b.y - b.x * a.y
+	}
+
+	fn has_point(&self, mut p: Vec2) -> bool {
+		let tmp = self.end - self.start;
+		p -= self.start;
+		Self::point_cross_product(tmp, p) < TOLERANCE
+	}
+
+	fn left_of_point(&self, mut p: Vec2) -> bool {
+		let tmp = self.end - self.start;
+		p -= self.start;
+		Self::point_cross_product(tmp, p) < 0.0
+	}
+
+	fn touches_or_crosses(&self, b: &LineSegment) -> bool {
+		self.has_point(b.start)
+			|| self.has_point(b.end)
+			|| (self.left_of_point(b.start) ^ self.left_of_point(b.end))
+	}
 }
 
 #[cfg(test)]
@@ -94,6 +134,15 @@ mod test {
 
 		fn top_right(&self) -> Vec2 {
 			self.center + self.half_size
+		}
+
+		// We don't need these two yet
+		fn previous_bottom_left(&self) -> Vec2 {
+			todo!()
+		}
+
+		fn previous_top_rght(&self) -> Vec2 {
+			todo!()
 		}
 	}
 
@@ -185,5 +234,12 @@ mod test {
 		let d = LineSegment::new(Vec2::new(-1.0, 0.0), Vec2::new(-3.0, -2.0));
 
 		assert!(a.parallel_to(&b))
+	}
+
+	#[test]
+	fn segment_has_point() {
+		let a = LineSegment::new(Vec2::new(0.0, 0.0), Vec2::new(2.0, 2.0));
+
+		assert!(a.has_point(Vec2::new(1.0, 1.0)))
 	}
 }
