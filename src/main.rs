@@ -15,7 +15,7 @@ impl Thing {
 
 		Self {
 			center: center.into(),
-			size: size.into(),
+			size,
 			half_size: size / 2,
 			draw: draw.into(),
 		}
@@ -35,7 +35,7 @@ impl physics::AxisAlignedBoundingBox for Thing {
 fn main() {
 	let mut smitty = Smitten::new((720, 480), "Square", 36);
 
-	let cheerpuff = Thing::new((0, 0), (1, 1), smitty.make_texture("images/cheerpuff.png"));
+	let square = Thing::new((0, 0), (1, 1), smitty.make_texture("images/puare.png"));
 	let mut us = Thing::new((-3.0, -3.0), (1, 1), Color::rgb(0.1, 0.3, 0.5));
 	let mut intersecting = false;
 	let speed = 0.075;
@@ -59,7 +59,7 @@ fn main() {
 			us.center.x += speed;
 		}
 
-		match physics::aabb_check(&us, &cheerpuff) {
+		match physics::aabb_check(&us, &square) {
 			true if !intersecting => {
 				us.draw = Color::rgb(0.5, 0.1, 0.2).into();
 				intersecting = true;
@@ -72,7 +72,7 @@ fn main() {
 		}
 
 		smitty.clear();
-		smitty.rect(cheerpuff.center, cheerpuff.size, cheerpuff.draw);
+		smitty.rect(square.center, square.size, square.draw);
 		smitty.rect(us.center, us.size, us.draw);
 		smitty.swap();
 	}
