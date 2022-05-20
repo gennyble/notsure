@@ -34,7 +34,7 @@ where
 }
 
 #[derive(Debug)]
-struct LineSegment {
+pub struct LineSegment {
 	start: Vec2,
 	end: Vec2,
 
@@ -43,7 +43,10 @@ struct LineSegment {
 }
 
 impl LineSegment {
-	pub fn new(start: Vec2, end: Vec2) -> Self {
+	pub fn new<S: Into<Vec2>, E: Into<Vec2>>(start: S, end: E) -> Self {
+		let start = start.into();
+		let end = end.into();
+
 		LineSegment {
 			start,
 			end,
@@ -77,32 +80,13 @@ impl LineSegment {
 		(self.vertical() && b.vertical()) || self.slope == b.slope
 	}
 
-	//TODO: gen- Check coincident (line contained in the other)
 	pub fn intersects_with(&self, b: &LineSegment) -> bool {
-		println!(
-			"bb: {} - self.tor(b) {} - b.tor(self) {}\n\t{:?}\n\t{:?}",
-			self.bounds().bounding_box_collides_with(&b.bounds()),
-			self.touches_or_crosses(b),
-			b.touches_or_crosses(self),
-			self,
-			b
-		);
-
 		self.bounds().bounding_box_collides_with(&b.bounds())
 			&& self.touches_or_crosses(b)
 			&& b.touches_or_crosses(self)
 	}
 
 	fn bounding_box_collides_with(&self, b: &LineSegment) -> bool {
-		println!("bounds!\n\t{:?}\n\t{:?}", self, b);
-
-		dbg!(
-			self.start.x <= b.end.x,
-			self.end.x >= b.start.x,
-			self.start.y <= b.end.y,
-			self.end.y >= b.start.y
-		);
-
 		self.start.x <= b.end.x
 			&& self.end.x >= b.start.x
 			&& self.start.y <= b.end.y
