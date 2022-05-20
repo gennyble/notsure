@@ -33,6 +33,7 @@ where
 	}
 }
 
+#[derive(Debug)]
 struct LineSegment {
 	start: Vec2,
 	end: Vec2,
@@ -59,7 +60,7 @@ impl LineSegment {
 	}
 
 	#[inline]
-	pub fn slope(start: Vec2, end: Vec2) -> f32 {
+	fn slope(start: Vec2, end: Vec2) -> f32 {
 		let dx = end.x - start.x;
 
 		if dx == 0.0 {
@@ -78,16 +79,62 @@ impl LineSegment {
 
 	//TODO: gen- Check coincident (line contained in the other)
 	pub fn intersects_with(&self, b: &LineSegment) -> bool {
-		self.bounding_box_collides_with(b)
+		println!(
+			"bb: {} - self.tor(b) {} - b.tor(self) {}\n\t{:?}\n\t{:?}",
+			self.bounds().bounding_box_collides_with(&b.bounds()),
+			self.touches_or_crosses(b),
+			b.touches_or_crosses(self),
+			self,
+			b
+		);
+
+		self.bounds().bounding_box_collides_with(&b.bounds())
 			&& self.touches_or_crosses(b)
 			&& b.touches_or_crosses(self)
 	}
 
 	fn bounding_box_collides_with(&self, b: &LineSegment) -> bool {
+		println!("bounds!\n\t{:?}\n\t{:?}", self, b);
+
+		dbg!(
+			self.start.x <= b.end.x,
+			self.end.x >= b.start.x,
+			self.start.y <= b.end.y,
+			self.end.y >= b.start.y
+		);
+
 		self.start.x <= b.end.x
 			&& self.end.x >= b.start.x
 			&& self.start.y <= b.end.y
 			&& self.end.y >= b.start.y
+	}
+
+	//TODO: gen- Please don't reuse the segment like this oh my god
+	fn bounds(&self) -> LineSegment {
+		let mut start = Vec2::ZERO;
+		let mut end = Vec2::ZERO;
+
+		if self.start.x < self.end.x {
+			start.x = self.start.x;
+			end.x = self.end.x;
+		} else {
+			start.x = self.end.x;
+			end.x = self.start.x;
+		}
+
+		if self.start.y < self.end.y {
+			start.y = self.start.y;
+			end.y = self.end.y;
+		} else {
+			start.y = self.end.y;
+			end.y = self.start.y;
+		}
+
+		Self {
+			start,
+			end,
+			slope: 0.0,
+		}
 	}
 
 	fn point_cross_product(a: Vec2, b: Vec2) -> f32 {
@@ -241,5 +288,216 @@ mod test {
 		let a = LineSegment::new(Vec2::new(0.0, 0.0), Vec2::new(2.0, 2.0));
 
 		assert!(a.has_point(Vec2::new(1.0, 1.0)))
+	}
+}
+
+/// These are the test cases from the below link where the intersection code was
+/// ported from
+/// https://martin-thoma.com/how-to-check-if-two-line-segments-intersect
+#[cfg(test)]
+mod martin {
+	use smitten::Vec2;
+
+	use super::LineSegment;
+
+	macro_rules! make_case {
+		(($a1x:literal, $a1y:literal), ($a2x:literal, $a2y:literal), ($b1x:literal, $b1y:literal), ($b2x:literal, $b2y:literal), ($ix:literal, $iy:literal)) => {
+			Case {
+				a: LineSegment {
+					start: Vec2 {
+						x: $a1x as f32,
+						y: $a1y as f32,
+					},
+					end: Vec2 {
+						x: $a2x as f32,
+						y: $a2y as f32,
+					},
+					slope: 0.0,
+				},
+				b: LineSegment {
+					start: Vec2 {
+						x: $b1x as f32,
+						y: $b1y as f32,
+					},
+					end: Vec2 {
+						x: $b2x as f32,
+						y: $b2y as f32,
+					},
+					slope: 0.0,
+				},
+				intersection: Some(Vec2 {
+					x: $ix as f32,
+					y: $iy as f32,
+				}),
+			}
+		};
+		(($a1x:literal, $a1y:literal), ($a2x:literal, $a2y:literal), ($b1x:literal, $b1y:literal), ($b2x:literal, $b2y:literal)) => {
+			Case {
+				a: LineSegment {
+					start: Vec2 {
+						x: $a1x as f32,
+						y: $a1y as f32,
+					},
+					end: Vec2 {
+						x: $a2x as f32,
+						y: $a2y as f32,
+					},
+					slope: 0.0,
+				},
+				b: LineSegment {
+					start: Vec2 {
+						x: $b1x as f32,
+						y: $b1y as f32,
+					},
+					end: Vec2 {
+						x: $b2x as f32,
+						y: $b2y as f32,
+					},
+					slope: 0.0,
+				},
+				intersection: None,
+			}
+		};
+	}
+
+	pub struct Case {
+		a: LineSegment,
+		b: LineSegment,
+		intersection: Option<Vec2>,
+	}
+
+	impl Case {
+		pub fn run_success(&self) -> bool {
+			self.a.intersects_with(&self.b)
+		}
+
+		pub fn run_fail(&self) -> bool {
+			!self.a.intersects_with(&self.b)
+		}
+	}
+
+	// Axis lines. Perpendicular and intersecting in the middle.
+	#[rustfmt::skip]
+	const T1: Case = make_case!(
+		(-5, 0), (5, 0),
+		(0, 5), (0, -5),
+		(0, 0)
+	);
+
+	// Non-perpendicular lines with one of the endpoints on the other
+	#[rustfmt::skip]
+	const T2: Case = make_case!(
+		(0, 0), (2, 2),
+		(1, 1), (4, 3),
+		(1, 1)
+	);
+
+	// Perpendicular lines, one endpoint on a line.
+	#[rustfmt::skip]
+	const T3: Case = make_case!(
+		(-2, 0), (0, 0),
+		(-2, -2), (-2, 2),
+		(-2, 0)
+	);
+
+	// Same as T3, but in the +,+ quadrant and no lines coindicent with the origin
+	#[rustfmt::skip]
+	const T4: Case = make_case!(
+		(4, 0), (4, 8),
+		(0, 4), (4, 4),
+		(4, 4)
+	);
+
+	// Coincident lines. B is inside A
+	#[rustfmt::skip]
+	const T5: Case = make_case!(
+		(0, 0), (10, 10),
+		(2, 2), (7, 7),
+		(2, 2)
+	);
+
+	// Literally the same line
+	#[rustfmt::skip]
+	const T6: Case = make_case!(
+		(6, -3), (-5, -1),
+		(6, -3), (-5, -1),
+		(6, -3)
+	);
+
+	// Parallel, X and Y projections collide but segments do not.
+	#[rustfmt::skip]
+	const F1: Case = make_case!(
+		(2, 2), (10, 10),
+		(4, 5), (8, 9)
+	);
+
+	// Parallel, Y projections collide. X touches at one point.
+	#[rustfmt::skip]
+	const F2: Case = make_case!(
+		(0, 0), (-7, 7),
+		(-7, 1), (-9, 3)
+	);
+
+	// Parallel, segments do not overlap
+	#[rustfmt::skip]
+	const F3: Case = make_case!(
+		(0, 0), (0, 2),
+		(5, 5), (5, 7)
+	);
+
+	// Perpendicular, segments do not overlap
+	#[rustfmt::skip]
+	const F4: Case = make_case!(
+		(0, 0), (0, 2),
+		(5, 5), (7, 5)
+	);
+
+	// Same line, but different segments.
+	#[rustfmt::skip]
+	const F5: Case = make_case!(
+		(-5, -5), (2, 2),
+		(6, 6), (10, 10)
+	);
+
+	// Less than a unit not touching
+	#[rustfmt::skip]
+	const F6: Case = make_case!(
+		(5, 0), (1, 5),
+		(0, 0), (2, 2)
+	);
+
+	// Parallel horiz., one above the other
+	#[rustfmt::skip]
+	const F7: Case = make_case!(
+		(-5, 2), (5, 2),
+		(-1, 5), (1, 5)
+	);
+
+	#[rustfmt::skip]
+	const F8: Case = make_case!(
+		(10, 0), (0, 10),
+		(5, 2), (5, 4)
+	);
+
+	#[test]
+	fn segments_intersect() {
+		assert!(T1.run_success());
+		assert!(T2.run_success());
+		assert!(T3.run_success());
+		assert!(T4.run_success());
+		assert!(T5.run_success());
+		assert!(T6.run_success());
+	}
+
+	#[test]
+	fn segments_do_not_intersect() {
+		assert!(!F1.run_success());
+		assert!(!F2.run_success());
+		assert!(!F3.run_success());
+		assert!(!F4.run_success());
+		assert!(!F5.run_success());
+		assert!(!F6.run_success());
+		assert!(!F7.run_success());
+		assert!(!F8.run_success());
 	}
 }
