@@ -1,7 +1,7 @@
 mod physics;
 
 use physics::{AxisAlignedBoundingBox, LineSegment};
-use smitten::{self, Color, Draw, Smitten, Vec2, VirtualKeyCode};
+use smitten::{self, Color, Draw, SignedDistance, Smitten, Vec2, VirtualKeyCode};
 
 pub struct Thing {
 	center: Vec2,
@@ -218,11 +218,28 @@ fn main() {
 		}
 
 		if let Some(p) = point_a {
-			smitty.rect(p, (0.25, 0.25), Color::rgb(0.6, 0.6, 0.2))
+			smitty.sdf(SignedDistance::Circle {
+				center: p,
+				radius: 0.2,
+				color: Color::rgb(0.6, 0.6, 0.2),
+			});
 		}
 
 		if let Some(p) = point_b {
-			smitty.rect(p, (0.25, 0.25), Color::rgb(0.2, 0.6, 0.2))
+			smitty.sdf(SignedDistance::Circle {
+				center: p,
+				radius: 0.2,
+				color: Color::rgb(0.2, 0.6, 0.2),
+			});
+		}
+
+		if let (Some(start), Some(end)) = (point_a, point_b) {
+			smitty.sdf(SignedDistance::LineSegment {
+				start,
+				end,
+				thickness: 2,
+				color: Color::rgb(0.6, 0.1, 0.8),
+			});
 		}
 
 		smitty.swap();
