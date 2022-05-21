@@ -1,3 +1,5 @@
+use std::fmt;
+
 use smitten::Vec2;
 
 const TOLERANCE: f32 = 0.00001;
@@ -33,7 +35,7 @@ where
 	}
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct LineSegment {
 	start: Vec2,
 	end: Vec2,
@@ -62,6 +64,13 @@ impl LineSegment {
 		self.start.y == self.end.y
 	}
 
+	pub fn swap_points(&mut self) {
+		//TODO: gen- Listen to clippy the almighty
+		let tmp = self.start;
+		self.start = self.end;
+		self.end = tmp;
+	}
+
 	#[inline]
 	fn slope(start: Vec2, end: Vec2) -> f32 {
 		let dx = end.x - start.x;
@@ -87,6 +96,8 @@ impl LineSegment {
 	}
 
 	fn bounding_box_collides_with(&self, b: &LineSegment) -> bool {
+		println!("bb: {} AND {}", self, b);
+
 		self.start.x <= b.end.x
 			&& self.end.x >= b.start.x
 			&& self.start.y <= b.end.y
@@ -125,23 +136,172 @@ impl LineSegment {
 		a.x * b.y - b.x * a.y
 	}
 
-	fn has_point(&self, mut p: Vec2) -> bool {
-		let tmp = self.end - self.start;
-		p -= self.start;
-		Self::point_cross_product(tmp, p) < TOLERANCE
+	fn has_point(&self, mut point: Vec2) -> bool {
+		let shifted_endpoint = self.end - self.start;
+		point -= self.start;
+		Self::point_cross_product(shifted_endpoint, point).abs() < TOLERANCE
 	}
 
 	fn left_of_point(&self, mut p: Vec2) -> bool {
 		let tmp = self.end - self.start;
 		p -= self.start;
+		println!("\nLeft: {}", Self::point_cross_product(tmp, p));
 		Self::point_cross_product(tmp, p) < 0.0
 	}
 
 	fn touches_or_crosses(&self, b: &LineSegment) -> bool {
+		println!(
+			"\n{} || {} || ({} ^ {})",
+			self.has_point(b.start),
+			self.has_point(b.end),
+			self.left_of_point(b.start),
+			self.left_of_point(b.end)
+		);
+
 		self.has_point(b.start)
 			|| self.has_point(b.end)
 			|| (self.left_of_point(b.start) ^ self.left_of_point(b.end))
 	}
+
+	// Comments copied directly from Martin Thoma's code in which this function is based
+	// Look for `getIntersection` on this page:
+	// https://martin-thoma.com/how-to-check-if-two-line-segments-intersect
+	pub fn calculate_intersection_point(&self, b: &LineSegment) -> Intersection {
+		let mut a = *self;
+		let mut b = *b;
+
+		println!("In!\n\tA: {}\n\tB: {}", a, b);
+		if a.vertical() {
+			println!("\tA vertical! (A)");
+			// Case (A)
+			// As a is a perfect vertical line, it cannot be represented
+			// nicely in a mathematical way. But we directly know that
+
+			let mut start = Vec2::new(a.start.x, 0.0);
+			let mut end = start;
+
+			if b.vertical() {
+				println!("\tB vertical! (AA)");
+				// Case (AA): Both lines vertical and, since we know they
+				// collide, we know all X are the same
+
+				// Normalize A and B so that their start is before their end
+				if a.start.y > a.end.y {
+					a.swap_points();
+				}
+				if b.start.y > b.end.y {
+					b.swap_points();
+				}
+
+				// Make sure A is lower than B
+				if a.start.y > b.start.y {
+					let tmp = a;
+					a = b;
+					b = tmp;
+				}
+
+				// Now we know that the y-value of a["first"] is the
+				// lowest of all 4 y values
+				// this means, we are either in case (AAA):
+				//   a: x--------------x
+				//   b:    x---------------x
+				// or in case (AAB)
+				//   a: x--------------x
+				//   b:    x-------x
+				// in both cases:
+				// get the relavant y intervall
+				start.y = b.start.y;
+				end.y = a.end.y.min(b.end.y);
+
+				return Intersection::Line(LineSegment::new(start, end));
+			} else {
+				println!("\tA vertical, B not. (AB)");
+				// Case (AB)
+				// we can mathematically represent line b as
+				//     y = m*x + t <=> t = y - m*x
+				// m = (y1-y2)/(x1-x2)
+
+				//TODO: gen- Is this slope equation not backwards??
+				let m = (b.start.y - b.end.y) / (b.start.x - b.end.x);
+				let t = b.start.y - m * b.start.x;
+
+				start.y = m * start.x + t;
+
+				return Intersection::Point(start);
+			}
+		} else if b.vertical() {
+			println!("\tB vertical, A not. (B)");
+			// Case (B)
+			// essentially the same as Case (AB), but with
+			// a and b switched
+
+			let mut start = Vec2::new(a.start.x, 0.0);
+			let mut end = start;
+
+			let tmp = a;
+			a = b;
+			b = tmp;
+
+			let m = (b.start.y - b.end.y) / (b.start.x - b.end.x);
+			let t = b.start.y - m * b.start.x;
+
+			start.y = m * start.x + t;
+
+			return Intersection::Point(start);
+		} else {
+			println!("\tneither vertical (C)");
+			// Case (C)
+			// Both lines can be represented mathematically
+			let ma = (a.start.y - a.end.y) / (a.start.x - a.end.x);
+			let mb = (b.start.y - b.end.y) / (b.start.x - b.end.x);
+			let ta = a.start.y - ma * a.start.x;
+			let tb = b.start.y - mb * b.start.x;
+
+			//TODO: gen- Should we have a tolerance on this because of FPE?
+			if ma == mb {
+				println!("\tParallel, this is a line");
+				// Normalize A and B so that their start is before their end
+				if a.start.y > a.end.y {
+					a.swap_points();
+				}
+				if b.start.y > b.end.y {
+					b.swap_points();
+				}
+
+				// Make sure A is lower than B
+				if a.start.y > b.start.y {
+					let tmp = a;
+					a = b;
+					b = tmp;
+				}
+
+				let start = Vec2::new(b.start.x, ma * b.start.x + ta);
+				let end = Vec2::new(a.end.x.min(b.end.x), ma * a.end.x.min(b.end.x) + ta);
+
+				return Intersection::Line(LineSegment::new(start, end));
+			} else {
+				println!("\tNot parallel!");
+				let x1 = (tb - ta) / (ma - mb);
+				return Intersection::Point(Vec2::new(x1, ma * x1 + ta));
+			}
+		}
+	}
+}
+
+impl fmt::Display for LineSegment {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(
+			f,
+			"(({},{}) | ({},{}))",
+			self.start.x, self.start.y, self.end.x, self.end.y
+		)
+	}
+}
+
+#[derive(Clone, Debug)]
+pub enum Intersection {
+	Line(LineSegment),
+	Point(Vec2),
 }
 
 #[cfg(test)]
@@ -360,6 +520,10 @@ mod martin {
 		}
 	}
 
+	//TODO: gen- Correct these. Some of the intersections here are lines.
+	//change the type in Case to Intersection and add another macro rule
+	// for six points total.
+
 	// Axis lines. Perpendicular and intersecting in the middle.
 	#[rustfmt::skip]
 	const T1: Case = make_case!(
@@ -463,6 +627,18 @@ mod martin {
 		(5, 2), (5, 4)
 	);
 
+	#[rustfmt::skip]
+	const F9: Case = make_case!(
+		(-10, 0), (0, 10),
+		(-5, 2), (-5, 4)
+	);
+
+	#[rustfmt::skip]
+	const F10: Case = make_case!(
+		(10, 0), (10, 10),
+		(5, 2), (5, 4)
+	);
+
 	#[test]
 	fn segments_intersect() {
 		assert!(T1.run_success());
@@ -483,5 +659,15 @@ mod martin {
 		assert!(!F6.run_success());
 		assert!(!F7.run_success());
 		assert!(!F8.run_success());
+	}
+
+	#[test]
+	fn f9() {
+		assert!(!F9.run_success());
+	}
+
+	#[test]
+	fn f10() {
+		assert!(!F10.run_success());
 	}
 }

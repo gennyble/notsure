@@ -1,6 +1,6 @@
 mod physics;
 
-use physics::{AxisAlignedBoundingBox, LineSegment};
+use physics::{AxisAlignedBoundingBox, Intersection, LineSegment};
 use smitten::{self, Color, Draw, SignedDistance, Smitten, Vec2, VirtualKeyCode};
 
 pub struct Thing {
@@ -44,6 +44,29 @@ impl Thing {
 		ret[3] = b_edges.iter().any(|l| self.left().intersects_with(l));
 
 		ret
+	}
+
+	pub fn intersect_segment(&self, seg: &LineSegment) -> Vec<Intersection> {
+		let b_edges = vec![self.top(), self.right(), self.bottom(), self.left()];
+
+		b_edges
+			.into_iter()
+			.filter_map(|e| {
+				if e.intersects_with(seg) {
+					let intersect = e.calculate_intersection_point(seg);
+
+					if let Intersection::Point(p) = intersect {
+						println!("Intersect! Point {},{}", p.x, p.y);
+					} else {
+						println!("Intersect! Line!");
+					}
+
+					Some(intersect)
+				} else {
+					None
+				}
+			})
+			.collect()
 	}
 
 	fn top(&self) -> LineSegment {
@@ -129,8 +152,10 @@ fn main() {
 	let mut intersecting = false;
 	let speed = 0.075;
 
+	let mut sdf = vec![];
 	let mut point_a = None;
 	let mut point_b = None;
+	let mut down_last = false;
 
 	loop {
 		let _events = smitty.events();
@@ -233,13 +258,54 @@ fn main() {
 			});
 		}
 
-		if let (Some(start), Some(end)) = (point_a, point_b) {
-			smitty.sdf(SignedDistance::LineSegment {
-				start,
-				end,
-				thickness: 2,
-				color: Color::rgb(0.6, 0.1, 0.8),
-			});
+		if !down_last && smitty.is_key_down(VirtualKeyCode::T) {
+			down_last = true;
+			if let (Some(start), Some(end)) = (point_a, point_b) {
+				let end = us.center;
+
+				let sdfseg = SignedDistance::LineSegment {
+					start,
+					end,
+					thickness: 2,
+					color: Color::rgb(0.6, 0.1, 0.8),
+				};
+				sdf.push(sdfseg);
+
+				let seg = LineSegment::new(start, end);
+				let is = square.intersect_segment(&seg);
+
+				let colors = vec![
+					Color::rgb(1.0, 0.0, 0.0),
+					Color::rgb(0.0, 1.0, 0.0),
+					Color::rgb(0.0, 0.0, 1.0),
+					Color::rgb(1.0, 1.0, 0.0),
+					Color::rgb(1.0, 0.0, 1.0),
+					Color::rgb(0.0, 1.0, 1.0),
+				];
+
+				for (i, &c) in is.iter().zip(colors.iter()) {
+					if let Intersection::Point(v) = i {
+						println!(
+							"INTERSECTION POINT: ({},{}) color ({}, {}, {})",
+							v.x, v.y, c.r, c.g, c.b
+						);
+
+						sdf.push(SignedDistance::Circle {
+							center: *v,
+							radius: 0.075,
+							color: c,
+						});
+					}
+				}
+			}
+		}
+
+		if smitty.is_key_down(VirtualKeyCode::R) {
+			down_last = false;
+		}
+
+		for sdf in &sdf {
+			smitty.sdf(*sdf);
 		}
 
 		smitty.swap();
