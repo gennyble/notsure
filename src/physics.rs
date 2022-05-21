@@ -32,17 +32,20 @@ pub struct LineSegment {
 
 	// If the line is vertical, this will be f32::NAN
 	slope: f32,
+	y_intercept: f32,
 }
 
 impl LineSegment {
 	pub fn new<S: Into<Vec2>, E: Into<Vec2>>(start: S, end: E) -> Self {
 		let start = start.into();
 		let end = end.into();
+		let slope = Self::slope(start, end);
 
 		LineSegment {
 			start,
 			end,
-			slope: Self::slope(start, end),
+			slope,
+			y_intercept: Self::y_intercept(start, slope),
 		}
 	}
 
@@ -68,6 +71,10 @@ impl LineSegment {
 
 		let dy = end.y - start.y;
 		dy / dx
+	}
+
+	fn y_intercept(start: Vec2, slope: f32) -> f32 {
+		start.y - slope * start.x
 	}
 
 	//TODO: gen- uh, what to do about floating point errors?
@@ -114,6 +121,7 @@ impl LineSegment {
 			start,
 			end,
 			slope: 0.0,
+			y_intercept: 0.0,
 		}
 	}
 
@@ -191,11 +199,7 @@ impl LineSegment {
 				//     y = m*x + t <=> t = y - m*x
 				// m = (y1-y2)/(x1-x2)
 
-				//TODO: gen- Is this slope equation not backwards??
-				let m = (b.start.y - b.end.y) / (b.start.x - b.end.x);
-				let t = b.start.y - m * b.start.x;
-
-				start.y = m * start.x + t;
+				start.y = b.slope * start.x + b.y_intercept;
 
 				Intersection::Point(start)
 			}
@@ -208,22 +212,14 @@ impl LineSegment {
 
 			std::mem::swap(&mut a, &mut b);
 
-			let m = (b.start.y - b.end.y) / (b.start.x - b.end.x);
-			let t = b.start.y - m * b.start.x;
-
-			start.y = m * start.x + t;
+			start.y = b.slope * start.x + b.y_intercept;
 
 			Intersection::Point(start)
 		} else {
 			// Case (C)
 			// Both lines can be represented mathematically
-			let ma = (a.start.y - a.end.y) / (a.start.x - a.end.x);
-			let mb = (b.start.y - b.end.y) / (b.start.x - b.end.x);
-			let ta = a.start.y - ma * a.start.x;
-			let tb = b.start.y - mb * b.start.x;
 
-			//TODO: gen- Should we have a tolerance on this because of FPE?
-			if ma == mb {
+			if a.parallel_to(&b) {
 				// Normalize A and B so that their start is before their end
 				if a.start.y > a.end.y {
 					a.swap_points();
@@ -237,13 +233,16 @@ impl LineSegment {
 					std::mem::swap(&mut a, &mut b);
 				}
 
-				let start = Vec2::new(b.start.x, ma * b.start.x + ta);
-				let end = Vec2::new(a.end.x.min(b.end.x), ma * a.end.x.min(b.end.x) + ta);
+				let start = Vec2::new(b.start.x, a.slope * b.start.x + a.y_intercept);
+				let end = Vec2::new(
+					a.end.x.min(b.end.x),
+					a.slope * a.end.x.min(b.end.x) + a.y_intercept,
+				);
 
 				Intersection::Line(LineSegment::new(start, end))
 			} else {
-				let x1 = (tb - ta) / (ma - mb);
-				Intersection::Point(Vec2::new(x1, ma * x1 + ta))
+				let x1 = (b.y_intercept - a.y_intercept) / (a.slope - b.slope);
+				Intersection::Point(Vec2::new(x1, a.slope * x1 + a.y_intercept))
 			}
 		}
 	}
@@ -273,7 +272,6 @@ mod test {
 
 	use super::{AxisAlignedBoundingBox, LineSegment};
 
-	// A more traditional graphics model used here than the one in smitten
 	struct Thing {
 		center: Vec2,
 		half_size: Vec2,
@@ -405,6 +403,9 @@ mod martin {
 
 	use super::LineSegment;
 
+	//TODO: gen- New macro to replace this one and the test_success/fail.
+	//We'll need the slope and intercept for checking the intersection now
+	//and float math is disallowed in const :sob:
 	macro_rules! make_case {
 		(($a1x:literal, $a1y:literal), ($a2x:literal, $a2y:literal), ($b1x:literal, $b1y:literal), ($b2x:literal, $b2y:literal), ($ix:literal, $iy:literal)) => {
 			Case {
@@ -418,6 +419,7 @@ mod martin {
 						y: $a2y as f32,
 					},
 					slope: 0.0,
+					y_intercept: 0.0,
 				},
 				b: LineSegment {
 					start: Vec2 {
@@ -429,6 +431,7 @@ mod martin {
 						y: $b2y as f32,
 					},
 					slope: 0.0,
+					y_intercept: 0.0,
 				},
 				intersection: Some(Vec2 {
 					x: $ix as f32,
@@ -448,6 +451,7 @@ mod martin {
 						y: $a2y as f32,
 					},
 					slope: 0.0,
+					y_intercept: 0.0,
 				},
 				b: LineSegment {
 					start: Vec2 {
@@ -459,6 +463,7 @@ mod martin {
 						y: $b2y as f32,
 					},
 					slope: 0.0,
+					y_intercept: 0.0,
 				},
 				intersection: None,
 			}
