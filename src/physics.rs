@@ -181,9 +181,7 @@ impl LineSegment {
 
 				// Make sure A is lower than B
 				if a.start.y > b.start.y {
-					let tmp = a;
-					a = b;
-					b = tmp;
+					std::mem::swap(&mut a, &mut b);
 				}
 
 				// Now we know that the y-value of a["first"] is the
@@ -222,9 +220,7 @@ impl LineSegment {
 			let mut start = Vec2::new(a.start.x, 0.0);
 			let mut end = start;
 
-			let tmp = a;
-			a = b;
-			b = tmp;
+			std::mem::swap(&mut a, &mut b);
 
 			let m = (b.start.y - b.end.y) / (b.start.x - b.end.x);
 			let t = b.start.y - m * b.start.x;
@@ -252,9 +248,7 @@ impl LineSegment {
 
 				// Make sure A is lower than B
 				if a.start.y > b.start.y {
-					let tmp = a;
-					a = b;
-					b = tmp;
+					std::mem::swap(&mut a, &mut b);
 				}
 
 				let start = Vec2::new(b.start.x, ma * b.start.x + ta);
@@ -405,7 +399,7 @@ mod test {
 		let c = LineSegment::new(Vec2::new(0.0, 0.0), Vec2::new(-2.0, -2.0));
 		let d = LineSegment::new(Vec2::new(-1.0, 0.0), Vec2::new(-3.0, -2.0));
 
-		assert!(a.parallel_to(&b))
+		assert!(c.parallel_to(&d))
 	}
 
 	#[test]
@@ -499,6 +493,24 @@ mod martin {
 		pub fn run_fail(&self) -> bool {
 			!self.a.intersects_with(&self.b)
 		}
+	}
+
+	macro_rules! test_success {
+		($test_id:ident, $testname:ident) => {
+			#[test]
+			fn $testname() {
+				assert!($test_id.run_success())
+			}
+		};
+	}
+
+	macro_rules! test_fail {
+		($test_id:ident, $testname:ident) => {
+			#[test]
+			fn $testname() {
+				assert!($test_id.run_fail())
+			}
+		};
 	}
 
 	//TODO: gen- Correct these. Some of the intersections here are lines.
@@ -620,35 +632,21 @@ mod martin {
 		(5, 2), (5, 4)
 	);
 
-	#[test]
-	fn segments_intersect() {
-		assert!(T1.run_success());
-		assert!(T2.run_success());
-		assert!(T3.run_success());
-		assert!(T4.run_success());
-		assert!(T5.run_success());
-		assert!(T6.run_success());
-	}
+	test_success!(T1, test_t1);
+	test_success!(T2, test_t2);
+	test_success!(T3, test_t3);
+	test_success!(T4, test_t4);
+	test_success!(T5, test_t5);
+	test_success!(T6, test_t6);
 
-	#[test]
-	fn segments_do_not_intersect() {
-		assert!(!F1.run_success());
-		assert!(!F2.run_success());
-		assert!(!F3.run_success());
-		assert!(!F4.run_success());
-		assert!(!F5.run_success());
-		assert!(!F6.run_success());
-		assert!(!F7.run_success());
-		assert!(!F8.run_success());
-	}
-
-	#[test]
-	fn f9() {
-		assert!(!F9.run_success());
-	}
-
-	#[test]
-	fn f10() {
-		assert!(!F10.run_success());
-	}
+	test_fail!(F1, test_f1);
+	test_fail!(F2, test_f2);
+	test_fail!(F3, test_f3);
+	test_fail!(F4, test_f4);
+	test_fail!(F5, test_f5);
+	test_fail!(F6, test_f6);
+	test_fail!(F7, test_f7);
+	test_fail!(F8, test_f8);
+	test_fail!(F9, test_f9);
+	test_fail!(F10, test_f10);
 }
