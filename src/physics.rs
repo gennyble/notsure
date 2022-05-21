@@ -96,8 +96,6 @@ impl LineSegment {
 	}
 
 	fn bounding_box_collides_with(&self, b: &LineSegment) -> bool {
-		println!("bb: {} AND {}", self, b);
-
 		self.start.x <= b.end.x
 			&& self.end.x >= b.start.x
 			&& self.start.y <= b.end.y
@@ -145,19 +143,10 @@ impl LineSegment {
 	fn left_of_point(&self, mut p: Vec2) -> bool {
 		let tmp = self.end - self.start;
 		p -= self.start;
-		println!("\nLeft: {}", Self::point_cross_product(tmp, p));
 		Self::point_cross_product(tmp, p) < 0.0
 	}
 
 	fn touches_or_crosses(&self, b: &LineSegment) -> bool {
-		println!(
-			"\n{} || {} || ({} ^ {})",
-			self.has_point(b.start),
-			self.has_point(b.end),
-			self.left_of_point(b.start),
-			self.left_of_point(b.end)
-		);
-
 		self.has_point(b.start)
 			|| self.has_point(b.end)
 			|| (self.left_of_point(b.start) ^ self.left_of_point(b.end))
@@ -170,9 +159,7 @@ impl LineSegment {
 		let mut a = *self;
 		let mut b = *b;
 
-		println!("In!\n\tA: {}\n\tB: {}", a, b);
 		if a.vertical() {
-			println!("\tA vertical! (A)");
 			// Case (A)
 			// As a is a perfect vertical line, it cannot be represented
 			// nicely in a mathematical way. But we directly know that
@@ -181,7 +168,6 @@ impl LineSegment {
 			let mut end = start;
 
 			if b.vertical() {
-				println!("\tB vertical! (AA)");
 				// Case (AA): Both lines vertical and, since we know they
 				// collide, we know all X are the same
 
@@ -213,9 +199,8 @@ impl LineSegment {
 				start.y = b.start.y;
 				end.y = a.end.y.min(b.end.y);
 
-				return Intersection::Line(LineSegment::new(start, end));
+				Intersection::Line(LineSegment::new(start, end))
 			} else {
-				println!("\tA vertical, B not. (AB)");
 				// Case (AB)
 				// we can mathematically represent line b as
 				//     y = m*x + t <=> t = y - m*x
@@ -227,10 +212,9 @@ impl LineSegment {
 
 				start.y = m * start.x + t;
 
-				return Intersection::Point(start);
+				Intersection::Point(start)
 			}
 		} else if b.vertical() {
-			println!("\tB vertical, A not. (B)");
 			// Case (B)
 			// essentially the same as Case (AB), but with
 			// a and b switched
@@ -247,9 +231,8 @@ impl LineSegment {
 
 			start.y = m * start.x + t;
 
-			return Intersection::Point(start);
+			Intersection::Point(start)
 		} else {
-			println!("\tneither vertical (C)");
 			// Case (C)
 			// Both lines can be represented mathematically
 			let ma = (a.start.y - a.end.y) / (a.start.x - a.end.x);
@@ -259,7 +242,6 @@ impl LineSegment {
 
 			//TODO: gen- Should we have a tolerance on this because of FPE?
 			if ma == mb {
-				println!("\tParallel, this is a line");
 				// Normalize A and B so that their start is before their end
 				if a.start.y > a.end.y {
 					a.swap_points();
@@ -278,11 +260,10 @@ impl LineSegment {
 				let start = Vec2::new(b.start.x, ma * b.start.x + ta);
 				let end = Vec2::new(a.end.x.min(b.end.x), ma * a.end.x.min(b.end.x) + ta);
 
-				return Intersection::Line(LineSegment::new(start, end));
+				Intersection::Line(LineSegment::new(start, end))
 			} else {
-				println!("\tNot parallel!");
 				let x1 = (tb - ta) / (ma - mb);
-				return Intersection::Point(Vec2::new(x1, ma * x1 + ta));
+				Intersection::Point(Vec2::new(x1, ma * x1 + ta))
 			}
 		}
 	}
