@@ -27,8 +27,8 @@ where
 
 #[derive(Copy, Clone, Debug)]
 pub struct LineSegment {
-	start: Vec2,
-	end: Vec2,
+	pub start: Vec2,
+	pub end: Vec2,
 
 	// If the line is vertical, this will be f32::NAN
 	slope: f32,

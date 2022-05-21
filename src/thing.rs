@@ -2,12 +2,13 @@ use smitten::{Draw, Vec2};
 
 use crate::physics::{self, Intersection, LineSegment};
 
+#[derive(Copy, Clone, Debug)]
 pub struct Thing {
 	pub center: Vec2,
-	previous_center: Vec2,
+	pub previous_center: Vec2,
 
 	pub size: Vec2,
-	half_size: Vec2,
+	pub half_size: Vec2,
 	pub draw: Draw,
 }
 
@@ -31,6 +32,10 @@ impl Thing {
 		self.center += offset.into();
 	}
 
+	pub fn put<T: Into<Vec2>>(&mut self, wh: T) {
+		self.center = wh.into();
+	}
+
 	pub fn edge_intersections(&self, b: &Thing) -> Vec<bool> {
 		// Top, right, bottom, left
 		let mut ret = vec![false; 4];
@@ -45,16 +50,21 @@ impl Thing {
 		ret
 	}
 
-	pub fn intersect_segment(&self, seg: &LineSegment) -> Vec<Intersection> {
-		let b_edges = vec![self.top(), self.right(), self.bottom(), self.left()];
+	pub fn intersect_segment(&self, seg: &LineSegment) -> Vec<(Side, Intersection)> {
+		let b_edges = vec![
+			(Side::Top, self.top()),
+			(Side::Right, self.right()),
+			(Side::Bottom, self.bottom()),
+			(Side::Left, self.left()),
+		];
 
 		b_edges
 			.into_iter()
-			.filter_map(|e| {
+			.filter_map(|(side, e)| {
 				if e.intersects_with(seg) {
 					let intersect = e.calculate_intersection_point(seg);
 
-					Some(intersect)
+					Some((side, intersect))
 				} else {
 					None
 				}
@@ -62,7 +72,7 @@ impl Thing {
 			.collect()
 	}
 
-	fn top(&self) -> LineSegment {
+	pub fn top(&self) -> LineSegment {
 		LineSegment::new(
 			(
 				self.center.x - self.half_size.x,
@@ -75,7 +85,21 @@ impl Thing {
 		)
 	}
 
-	fn right(&self) -> LineSegment {
+	pub fn topright(&self) -> Vec2 {
+		Vec2::new(
+			self.center.x - self.half_size.x,
+			self.center.y + self.half_size.y,
+		)
+	}
+
+	pub fn topleft(&self) -> Vec2 {
+		Vec2::new(
+			self.center.x + self.half_size.x,
+			self.center.y + self.half_size.y,
+		)
+	}
+
+	pub fn right(&self) -> LineSegment {
 		LineSegment::new(
 			(
 				self.center.x - self.half_size.x,
@@ -88,7 +112,7 @@ impl Thing {
 		)
 	}
 
-	fn bottom(&self) -> LineSegment {
+	pub fn bottom(&self) -> LineSegment {
 		LineSegment::new(
 			(
 				self.center.x - self.half_size.x,
@@ -101,7 +125,21 @@ impl Thing {
 		)
 	}
 
-	fn left(&self) -> LineSegment {
+	pub fn bottomright(&self) -> Vec2 {
+		Vec2::new(
+			self.center.x + self.half_size.x,
+			self.center.y - self.half_size.y,
+		)
+	}
+
+	pub fn bottomleft(&self) -> Vec2 {
+		Vec2::new(
+			self.center.x - self.half_size.x,
+			self.center.y - self.half_size.y,
+		)
+	}
+
+	pub fn left(&self) -> LineSegment {
 		LineSegment::new(
 			(
 				self.center.x + self.half_size.x,
@@ -131,4 +169,12 @@ impl physics::AxisAlignedBoundingBox for Thing {
 	fn previous_top_rght(&self) -> Vec2 {
 		self.previous_center + self.half_size
 	}
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum Side {
+	Top,
+	Right,
+	Bottom,
+	Left,
 }
