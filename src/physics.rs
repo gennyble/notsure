@@ -22,17 +22,7 @@ where
 	let b_bl = b.bottom_left();
 	let b_tr = b.top_right();
 
-	if a_bl.x < b_tr.x && a_tr.x > b_bl.x {
-		// Collide on X axis
-		if a_bl.y < b_tr.y && a_tr.y > b_bl.y {
-			// Collide on y axis
-			true
-		} else {
-			false
-		}
-	} else {
-		false
-	}
+	a_bl.x < b_tr.x && a_tr.x > b_bl.x && a_bl.y < b_tr.y && a_tr.y > b_bl.y
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -65,10 +55,7 @@ impl LineSegment {
 	}
 
 	pub fn swap_points(&mut self) {
-		//TODO: gen- Listen to clippy the almighty
-		let tmp = self.start;
-		self.start = self.end;
-		self.end = tmp;
+		std::mem::swap(&mut self.start, &mut self.end);
 	}
 
 	#[inline]
@@ -218,7 +205,6 @@ impl LineSegment {
 			// a and b switched
 
 			let mut start = Vec2::new(a.start.x, 0.0);
-			let mut end = start;
 
 			std::mem::swap(&mut a, &mut b);
 
@@ -482,6 +468,7 @@ mod martin {
 	pub struct Case {
 		a: LineSegment,
 		b: LineSegment,
+		//TODO: gen- Check the intersection
 		intersection: Option<Vec2>,
 	}
 
