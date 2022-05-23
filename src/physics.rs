@@ -49,6 +49,8 @@ impl LineSegment {
 		}
 	}
 
+	pub fn start_slope_distance<S: Into<Vec2>>(start: S, slope: f32, distance: f32) {}
+
 	pub fn vertical(&self) -> bool {
 		self.start.x == self.end.x
 	}
@@ -59,6 +61,10 @@ impl LineSegment {
 
 	pub fn swap_points(&mut self) {
 		std::mem::swap(&mut self.start, &mut self.end);
+	}
+
+	pub fn length(&self) -> f32 {
+		self.start.distance_with(self.end)
 	}
 
 	#[inline]
