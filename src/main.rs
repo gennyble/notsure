@@ -2,7 +2,7 @@ mod physics;
 mod thing;
 
 use physics::{aabb_check, Intersection, LineSegment};
-use smitten::{self, Color, SignedDistance, Smitten, Vec2, VirtualKeyCode};
+use smitten::{self, Color, Key, SignedDistance, Smitten, Vec2};
 use thing::Thing;
 
 fn main() {
@@ -21,23 +21,23 @@ fn main() {
 		let _events = smitty.events();
 
 		// Keyboard Control
-		if smitty.is_key_down(VirtualKeyCode::Escape) {
+		if smitty.is_key_down(Key::Escape) {
 			break;
 		}
 
-		if smitty.is_key_down(VirtualKeyCode::W) {
+		if smitty.is_key_down(Key::W) {
 			us.offset((0.0, speed));
-		} else if smitty.is_key_down(VirtualKeyCode::S) {
+		} else if smitty.is_key_down(Key::S) {
 			us.offset((0.0, -speed));
 		}
 
-		if smitty.is_key_down(VirtualKeyCode::A) {
+		if smitty.is_key_down(Key::A) {
 			us.offset((-speed, 0.0));
-		} else if smitty.is_key_down(VirtualKeyCode::D) {
+		} else if smitty.is_key_down(Key::D) {
 			us.offset((speed, 0.0));
 		}
 
-		if smitty.is_key_down(VirtualKeyCode::E) {
+		if smitty.is_key_down(Key::E) {
 			if let Some(coords) = grid.get_coords(us.center) {
 				grid.set_tile(coords, Some(Tile::Solid));
 			}
